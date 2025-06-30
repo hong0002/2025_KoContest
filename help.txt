@@ -1,0 +1,22 @@
+## 1
+
+# 1) 홈 디렉토리에 Huggingface 캐시 디렉토리 생성
+mkdir -p ~/.cache/huggingface
+
+# 2) 환경변수로 지정 (터미널 세션에만 유효)
+export HF_HOME=~/.cache/huggingface
+export TRANSFORMERS_CACHE=~/.cache/huggingface
+
+# 3) 스크립트 실행 시 --cache_dir 옵션 사용
+python train_exaone_deep_7.8b.py \
+  … \
+  --cache_dir $TRANSFORMERS_CACHE \
+  …
+
+## 2
+
+training_args = TrainingArguments(
+    …,
+    cache_dir=os.path.expanduser("~/.cache/huggingface"),
+    …
+)
