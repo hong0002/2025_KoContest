@@ -1,11 +1,13 @@
 '''
 
-python run/test.py \
-  --input datasets/korean_language_rag_V1.0_test.json \
-  --output runs/EXAONE-Deep-7.8B/predictions.json \
-  --model_id LGAI-EXAONE/EXAONE-Deep-7.8B \
-  --adapter /home/oem/checkpoints/EXAONE-Deep-7.8B/best_model \
-  --device cuda:2
+export CUDA_VISIBLE_DEVICES=2
+
+python test_kanana.py \
+  --input  ko_datasets/korean_language_rag_V1.0_test.json \
+  --output runs/kanana-1.5-8b-instruct-2505/predictions.json \
+  --model_id kakaocorp/kanana-1.5-8b-instruct-2505 \
+  --adapter /home/oem/checkpoints/kanana-1.5-8b-instruct-2505/best_model \
+  --device cuda:0
 
 '''
 
@@ -18,7 +20,9 @@ from transformers import (
 )
 from peft import PeftModel
 import torch
-from src.data import DataCollatorForSupervisedDataset
+from src.data import CustomDataset
+from transformers import BitsAndBytesConfig
+from tqdm import tqdm
 
 def main():
     parser = argparse.ArgumentParser()
@@ -33,11 +37,17 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(args.model_id, trust_remote_code=True)
     tokenizer.pad_token = tokenizer.eos_token
 
+    bnb_config = BitsAndBytesConfig(
+        load_in_8bit=True,
+        llm_int8_threshold=6.0,   # 필요시 튜닝
+    )
+
+    # bitsandbytes 8-bit 양자화 없이 단일 GPU 쓰려면:
     base_model = AutoModelForCausalLM.from_pretrained(
         args.model_id,
-        device_map={0: args.device},      # bitsandbytes 쓰면 "device_map='auto'" 로
-        torch_dtype=torch.bfloat16,       # 필요에 따라
         trust_remote_code=True,
+        quantization_config=bnb_config,
+        device_map={"": args.device},   # 모든 파라미터를 cuda:2 에 할당
     )
 
     # 2) PEFT adapter 로드
@@ -45,17 +55,25 @@ def main():
     model.eval()
 
     # 3) 데이터셋 준비
-    dataset = DataCollatorForSupervisedDataset(args.input, tokenizer)
+    dataset = CustomDataset(args.input, tokenizer)
 
     # 4) 생성
     terminators = [tokenizer.eos_token_id]
     with open(args.input, "r", encoding="utf-8") as f:
         examples = json.load(f)
 
-    for i, inp in enumerate(dataset):
-        # inp: tensor([…]) 1D
+    # tqdm을 쓰려면 전체 샘플 수를 알려주면 좋습니다.
+    total = len(dataset)
+
+    os.makedirs(os.path.dirname(args.output), exist_ok=True)  # ← 폴더 자동 생성
+
+    for i, sample in enumerate(tqdm(dataset, total=total, desc="생성 진행")):
+        inp = sample["input_ids"]       # 1D Tensor
+        attention_mask = (inp != tokenizer.pad_token_id).long()
+
         out = model.generate(
             inp.unsqueeze(0).to(args.device),
+            attention_mask=attention_mask.unsqueeze(0).to(args.device),
             max_new_tokens=256,
             eos_token_id=terminators,
             pad_token_id=tokenizer.pad_token_id,

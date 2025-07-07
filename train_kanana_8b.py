@@ -1,12 +1,12 @@
 '''
 
-python train_exaone_deep_7.8b.py \
+python train_kanana_8b.py \
   --train_file datasets/korean_language_rag_V1.0_train.json \
   --valid_file datasets/korean_language_rag_V1.0_dev.json \
-  --model_id LGAI-EXAONE/EXAONE-Deep-7.8B \
+  --model_id kakaocorp/kanana-1.5-8b-instruct-2505 \
   --device 2 \
   --cache_dir $TRANSFORMERS_CACHE \
-  --output_dir ~/checkpoints/EXAONE-Deep-7.8B
+  --output_dir ~/checkpoints/kanana-1.5-8b-instruct-2505
 
 '''
 
@@ -40,7 +40,7 @@ class SupervisedTrainer(Trainer):
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Fine-tune EXAONE-Deep model with LoRA & DeepSpeed"
+        description="Fine-tune Kanana model with LoRA"
     )
     parser.add_argument("--train_file", type=str, required=True, help="Path to train JSON")
     parser.add_argument("--valid_file", type=str, required=True, help="Path to validation JSON")

@@ -25,12 +25,10 @@ from src.data import CustomDataset, DataCollatorForSupervisedDataset
 from peft import get_peft_config, get_peft_model, LoraConfig, TaskType
 from transformers import BitsAndBytesConfig
 
-
 class SupervisedTrainer(Trainer):
-    # return_outputs 뿐 아니라 추가 인자(num_items_in_batch 등)도 받도록 **kwargs 추가
-    def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
+    def compute_loss(self, model, inputs, return_outputs=False):
         # ① inputs dict에서 labels를 꺼냅니다.
-        labels = inputs.pop("labels", None)
+        labels = inputs.get("labels")
         # ② 모델 호출 시 labels 파라미터로 넘겨주면
         #    모델 내부에서 CrossEntropyLoss가 자동 계산됩니다.
         outputs = model(**inputs, labels=labels)

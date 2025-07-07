@@ -106,11 +106,20 @@ class CustomDataset(Dataset):
                 enable_thinking=False
             )
 
-            target = example.get("output", "")
-            if target != "":
-                target += tokenizer.eos_token
+            # ① example["output"] 가 dict 면 내부 문자열을 꺼내고, 아니면 그대로
+            raw_output = example.get("output", "")
+            if isinstance(raw_output, dict):
+                target_text = raw_output.get("answer", "")
+            else:
+                target_text = raw_output
+
+            # ② answer 문자열이 있으면 EOS 토큰 추가
+            if target_text:
+                target_text = target_text + tokenizer.eos_token
+
+            # ③ 토크나이즈
             target = tokenizer(
-                target,
+                target_text,
                 return_attention_mask=False,
                 add_special_tokens=False,
                 return_tensors="pt"
@@ -126,7 +135,11 @@ class CustomDataset(Dataset):
         return len(self.inp)
 
     def __getitem__(self, idx):
-        return self.inp[idx]
+        # 각 샘플을 dict로 반환해야 Trainer가 올바르게 배치화(pad & stack)합니다.
+        return {
+            "input_ids": self.inp[idx],   # 1D 텐서([seq_len])
+            "labels":    self.label[idx], # 1D 텐서([seq_len])
+        }
 
 
 class DataCollatorForSupervisedDataset(object):
